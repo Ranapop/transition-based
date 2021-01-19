@@ -24,7 +24,7 @@ class OracleTest(absltest.TestCase):
     expected_dependents = [[2], [3], [1, 4], [], []]
     self.assertEqual(dependents, expected_dependents)
 
-  def est_generate_sequence_of_actions_non_projective(self):
+  def test_generate_sequence_of_actions_non_projective(self):
     """
     Tree
     ROOT
