@@ -1,6 +1,6 @@
 from absl.testing import absltest
-from input_pipeline.oracle import extract_labelled_edges,\
-  extract_dependents, generate_sequence_of_actions,\
+from input_pipeline.oracle import get_labelled_edges,\
+  get_dependents, generate_sequence_of_actions,\
   ArcStandardAction
 
 """
@@ -11,16 +11,16 @@ from the project root directory.
 class OracleTest(absltest.TestCase):
 
 
-  def test_extract_labelled_edges(self):
+  def test_get_labelled_edges(self):
     heads = [-1, 2, 0, 1]
     labels = [None, 10, 20, 30]
-    labelled_edges = extract_labelled_edges(heads, labels)
+    labelled_edges = get_labelled_edges(heads, labels)
     expected_labelled_edges = {(2,1): 10, (0,2):20, (1,3):30}
     self.assertEqual(labelled_edges, expected_labelled_edges)
   
-  def test_extract_dependents(self):
+  def test_get_dependents(self):
     heads = [-1, 2, 0, 1, 2]
-    dependents = extract_dependents(heads)
+    dependents = get_dependents(heads)
     expected_dependents = [[2], [3], [1, 4], [], []]
     self.assertEqual(dependents, expected_dependents)
 
