@@ -2,9 +2,9 @@ from typing import List, Dict, Tuple
 from enum import Enum
 
 class ArcStandardAction(Enum):
-  LEFT_ARC = 1
-  RIGHT_ARC = 2
-  SHIFT = 3
+  LEFT_ARC = 0
+  RIGHT_ARC = 1
+  SHIFT = 2
 
 
 def has_dependents_processed(token_id: int,
