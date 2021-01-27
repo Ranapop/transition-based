@@ -36,15 +36,19 @@ class DataSetEntry(object):
 
     for line in lines:
       line_fields = line.split('\t')
-      token, head, relation = str(line_fields[TOKEN]), int(line_fields[HEAD]), str(line_fields[RELATION])
+      #TODO: check why the condition is needed.
+      if len(line_fields) > RELATION:
+        token, head, relation = str(line_fields[TOKEN]),\
+                                int(line_fields[HEAD]),\
+                                str(line_fields[RELATION])
 
-      if token not in dataset.tokens_vocab.keys():
-        dataset.tokens_vocab.update({token: len(dataset.tokens_vocab.keys())})
-      if relation not in dataset.relations_vocab.keys():
-        dataset.relations_vocab.update({relation: len(dataset.relations_vocab.keys())})
-      self.tokens.append(dataset.tokens_vocab[token])
-      self.heads.append(head)
-      self.labels.append(dataset.relations_vocab[relation])
+        if token not in dataset.tokens_vocab.keys():
+          dataset.tokens_vocab.update({token: len(dataset.tokens_vocab.keys())})
+        if relation not in dataset.relations_vocab.keys():
+          dataset.relations_vocab.update({relation: len(dataset.relations_vocab.keys())})
+        self.tokens.append(dataset.tokens_vocab[token])
+        self.heads.append(head)
+        self.labels.append(dataset.relations_vocab[relation])
 
 def load_from_file(file_path: str, cache=True) -> DataSet:
   """
