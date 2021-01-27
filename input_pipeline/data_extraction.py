@@ -5,6 +5,7 @@ import pickle as js
 TOKEN = 2
 HEAD = 6
 RELATION = 7
+NO_FIELDS = 10
 
 class DataSet(object):
 
@@ -36,8 +37,10 @@ class DataSetEntry(object):
 
     for line in lines:
       line_fields = line.split('\t')
-      #TODO: check why the condition is needed.
-      if len(line_fields) > RELATION:
+
+      # TODO: proces entries with missing head
+      # Make sure we are processing token lines having NO_FIELDS columns
+      if len(line_fields) == NO_FIELDS:
         token, head, relation = str(line_fields[TOKEN]),\
                                 int(line_fields[HEAD]),\
                                 str(line_fields[RELATION])
