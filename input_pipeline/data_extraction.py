@@ -1,27 +1,33 @@
-from os import makedirs, path
-from typing import Tuple, List, Dict
-from oracle import generate_sequence_of_actions
+from os import path
+from typing import List, Dict
 import pickle as js
+
+TOKEN = 2
+HEAD = 6
+RELATION = 7
 
 class DataSet(object):
 
   def __init__(self, lines: List[str]):
-    self.sentences: List[Sentence] = []
+    self.dataset_entries: List[DataSetEntry] = []
     self.tokens_vocab: Dict[str, int] = {}
     self.relations_vocab: Dict[str, int] = {}
 
     entry_lines = []
+
+    # process lines belonging to a single entry until empty line is found
     for line in lines:
       line = line.strip()
       if line:
         entry_lines.append(line)
       elif entry_lines:
-        self.sentences.append(Sentence(entry_lines, self))
+        self.dataset_entries.append(DataSetEntry(entry_lines, self))
         entry_lines.clear()
     if entry_lines:
-      self.sentences.append(Sentence(entry_lines, self))
+      self.dataset_entries.append(DataSetEntry(entry_lines, self))
 
-class Sentence(object):
+
+class DataSetEntry(object):
 
   def __init__(self, lines: List[str], dataset: DataSet):
     self.tokens: List[int] = [-1]
@@ -30,15 +36,15 @@ class Sentence(object):
 
     for line in lines:
       line_fields = line.split('\t')
-      if len(line_fields) > 7:
-        token, head, relation = str(line_fields[2]), int(line_fields[6]), str(line_fields[7])
-        if token not in dataset.tokens_vocab.keys():
-          dataset.tokens_vocab.update({token: len(dataset.tokens_vocab.keys())})
-        if relation not in dataset.relations_vocab.keys():
-          dataset.relations_vocab.update({relation: len(dataset.relations_vocab.keys())})
-        self.tokens.append(dataset.tokens_vocab[token])
-        self.heads.append(head)
-        self.labels.append(dataset.relations_vocab[relation])
+      token, head, relation = str(line_fields[TOKEN]), int(line_fields[HEAD]), str(line_fields[RELATION])
+
+      if token not in dataset.tokens_vocab.keys():
+        dataset.tokens_vocab.update({token: len(dataset.tokens_vocab.keys())})
+      if relation not in dataset.relations_vocab.keys():
+        dataset.relations_vocab.update({relation: len(dataset.relations_vocab.keys())})
+      self.tokens.append(dataset.tokens_vocab[token])
+      self.heads.append(head)
+      self.labels.append(dataset.relations_vocab[relation])
 
 def load_from_file(file_path: str, cache=True) -> DataSet:
   """
@@ -59,24 +65,9 @@ def load_from_file(file_path: str, cache=True) -> DataSet:
       lines = file.readlines()
       data = DataSet(lines)
 
-      print(cached_file_path)
-      print(path.exists(cached_file_path))
       if cache and not path.exists(cached_file_path):
         print("Caching to file: " + cached_file_path)
         with open(cached_file_path, "wb") as cached_file:
           js.dump(data, cached_file)
 
   return data
-
-
-if __name__ == '__main__':
-  file_path = "/home/paul/PycharmProjects/transition-based/mock_data/ro_rrt-ud-test.conllu"
-  mock_data = load_from_file(file_path)
-  for sentence in mock_data.sentences:
-    print(sentence.tokens)
-    act_seq = generate_sequence_of_actions(sentence.tokens, sentence.heads, sentence.labels)
-    if act_seq:
-      act_types, act_labels = act_seq
-      print(act_types)
-    else:
-      print("No sequence possible.")
