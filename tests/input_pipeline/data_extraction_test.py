@@ -11,7 +11,7 @@ from the project root directory.
 class DataExtractionTest(absltest.TestCase):
 
   def test_load_from_file(self):
-    file_path = "/home/paul/PycharmProjects/transition-based/tests/test_data/example.conllu"
+    file_path = "tests/test_data/example.conllu"
     mock_data = load_from_file(file_path)
     self.assertEqual(len(mock_data.dataset_entries), 1)
     dataset_entry = mock_data.dataset_entries[0]
