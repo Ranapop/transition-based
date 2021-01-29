@@ -1,9 +1,9 @@
 from typing import List
 import dynet as dy
 from input_pipeline.data_extraction import load_from_file, DataSet
-from input_pipeline.oracle import generate_sequence_of_actions
+from input_pipeline.oracle import generate_sequence_of_actions, apply_action
 
-NO_EPOCHS = 100
+NO_EPOCHS = 50
 EMBEDDINGS_SIZE = 20
 LSTM_NUM_OF_LAYERS = 1
 LSTM_STATE_SIZE = 25
@@ -29,18 +29,29 @@ class ArcStandardModel():
     stack = []
     buffer = list(range(n))
     losses = []
+    predicted_actions = []
+    arc_history = []
+    correct_predictions = 0
     for gold_action_type in action_types:
+      #TODO: Arc history is not needed at this point
+      apply_action(gold_action_type, stack, buffer, arc_history)
       features = extract_features(stack, buffer, bilstm_repr)
       logits = arc_standard_model.action_classifier.add_to_cg(features)
       probs = dy.softmax(logits)
       loss = -dy.log(dy.pick(probs, gold_action_type.value))
       losses.append(loss)
+      predicted_actions.append(probs.npvalue().argmax())
     loss = dy.esum(losses)
     loss_value = loss.value()
+    no_actions = len(action_types)
+    for i in range(no_actions):
+      if action_types[i].value == predicted_actions[i]:
+        correct_predictions += 1
+    accuracy = correct_predictions/no_actions
     if train:
       loss.backward()
       self.trainer.update()
-    return probs, loss_value
+    return predicted_actions, loss_value, accuracy
 class SentenceEncoder():
   
   def __init__(self, model: dy.Model, vocab_size: int):
@@ -71,7 +82,7 @@ class ActionClassiffier():
     classifier_input_size = no_features * BILSTM_STATE_SIZE
     self.weights_classiffier = model.add_parameters(
         (NO_OUTPUT_CLASSES, classifier_input_size))
-    self.bias_classifier = model.add_parameters((NO_OUTPUT_CLASSES))
+    self.bias_classifier = model.add_parameters(NO_OUTPUT_CLASSES)
   
   def add_to_cg(self, features):
     w = dy.parameter(self.weights_classiffier)
@@ -107,6 +118,7 @@ def extract_features(stack: List[int], buffer: List[int],
 
 def train_one_epoch(arc_standard_model: ArcStandardModel, dataset: DataSet):
   sum_loss = 0
+  sum_accuracy = 0
   valid_entries = 0
   i = 0
   for data_entry in dataset.dataset_entries:
@@ -119,19 +131,21 @@ def train_one_epoch(arc_standard_model: ArcStandardModel, dataset: DataSet):
     # Make sure the action sequence can be generated.
     if act_seq:
       act_types = act_seq[0]
-      probs, loss_value = arc_standard_model.create_cg(data_entry.tokens,
+      predicted, loss_value, accuracy = arc_standard_model.create_cg(data_entry.tokens,
                                                        act_types,
                                                        train=True)
       sum_loss += loss_value
-      valid_entries+=1
+      sum_accuracy += accuracy
+      valid_entries += 1
   avg_loss = sum_loss / valid_entries
-  return avg_loss
+  avg_accuracy = sum_accuracy/valid_entries
+  return avg_loss, avg_accuracy
 
 if __name__ == '__main__':
-  file_path = "data/ud-treebanks-v2.7/UD_English-Pronouns/en_pronouns-ud-test.conllu"
+  file_path = "/home/paul/PycharmProjects/transition-based/mock_data/ro_rrt-ud-train.conllu"
   dataset = load_from_file(file_path)
   vocab_size = len(dataset.tokens_vocab.keys())
   arc_standard_model = ArcStandardModel(vocab_size)
   for epoch in range(NO_EPOCHS):
-    avg_loss = train_one_epoch(arc_standard_model, dataset)
-    print('Epoch {0} Loss {1}'.format(epoch, avg_loss))
+    avg_loss, avg_accuracy = train_one_epoch(arc_standard_model, dataset)
+    print('Epoch {0} Loss {1} Accuracy {2}'.format(epoch, avg_loss, avg_accuracy))
