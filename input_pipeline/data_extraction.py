@@ -2,6 +2,7 @@ from os import path
 from typing import List, Dict
 import pickle as js
 
+POSITION = 0
 TOKEN = 2
 HEAD = 6
 RELATION = 7
@@ -37,21 +38,22 @@ class DataSetEntry(object):
 
     for line in lines:
       line_fields = line.split('\t')
-
-      # TODO: proces entries with missing head
-      # Make sure we are processing token lines having NO_FIELDS columns
       if len(line_fields) == NO_FIELDS:
-        token, head, relation = str(line_fields[TOKEN]),\
-                                int(line_fields[HEAD]),\
-                                str(line_fields[RELATION])
+        position_in_sentence = line_fields[POSITION]
+        # Skip words tokenized in multiple tokens (eg don't -> do not)
+        # that don't have a single int position associated and have missing data. 
+        if position_in_sentence.isnumeric():
+          token, head, relation = str(line_fields[TOKEN]),\
+                                  int(line_fields[HEAD]),\
+                                  str(line_fields[RELATION])
 
-        if token not in dataset.tokens_vocab.keys():
-          dataset.tokens_vocab.update({token: len(dataset.tokens_vocab.keys())})
-        if relation not in dataset.relations_vocab.keys():
-          dataset.relations_vocab.update({relation: len(dataset.relations_vocab.keys())})
-        self.tokens.append(dataset.tokens_vocab[token])
-        self.heads.append(head)
-        self.labels.append(dataset.relations_vocab[relation])
+          if token not in dataset.tokens_vocab.keys():
+            dataset.tokens_vocab.update({token: len(dataset.tokens_vocab.keys())})
+          if relation not in dataset.relations_vocab.keys():
+            dataset.relations_vocab.update({relation: len(dataset.relations_vocab.keys())})
+          self.tokens.append(dataset.tokens_vocab[token])
+          self.heads.append(head)
+          self.labels.append(dataset.relations_vocab[relation])
 
 def load_from_file(file_path: str, cache=True) -> DataSet:
   """
