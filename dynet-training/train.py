@@ -3,7 +3,7 @@ import dynet as dy
 from input_pipeline.data_extraction import load_from_file, DataSet
 from input_pipeline.oracle import generate_sequence_of_actions, apply_action
 
-NO_EPOCHS = 50
+NO_EPOCHS = 20
 EMBEDDINGS_SIZE = 20
 LSTM_NUM_OF_LAYERS = 1
 LSTM_STATE_SIZE = 25
@@ -34,7 +34,6 @@ class ArcStandardModel():
     losses = []
     predicted_actions = []
     arc_history = []
-    correct_predictions = 0
     for gold_action_type in action_types:
       features = extract_features(stack, buffer, bilstm_repr)
       logits = self.action_classifier.add_to_cg(features)
@@ -46,15 +45,23 @@ class ArcStandardModel():
       apply_action(gold_action_type, stack, buffer, arc_history)
     loss = dy.esum(losses)
     loss_value = loss.value()
-    no_actions = len(action_types)
-    for i in range(no_actions):
-      if action_types[i].value == predicted_actions[i]:
-        correct_predictions += 1
-    accuracy = correct_predictions/no_actions
+    gold_actions = [action_type.value for action_type in action_types]
+    accuracy = ArcStandardModel.compute_accuracy(gold_actions,
+                                                 predicted_actions)
     if train:
       loss.backward()
       self.trainer.update()
     return predicted_actions, loss_value, accuracy
+
+  @staticmethod
+  def compute_accuracy(gold_actions: List[int], predicted_actions: List[int]):
+    no_actions = len(gold_actions)
+    correct_predictions = 0
+    for i in range(no_actions):
+      if gold_actions[i] == predicted_actions[i]:
+        correct_predictions += 1
+    accuracy = correct_predictions/no_actions
+    return accuracy
 class SentenceEncoder():
   
   def __init__(self, model: dy.Model, vocab_size: int):
