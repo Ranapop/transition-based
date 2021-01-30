@@ -36,14 +36,14 @@ class ArcStandardModel():
     arc_history = []
     correct_predictions = 0
     for gold_action_type in action_types:
-      #TODO: Arc history is not needed at this point
-      apply_action(gold_action_type, stack, buffer, arc_history)
       features = extract_features(stack, buffer, bilstm_repr)
       logits = self.action_classifier.add_to_cg(features)
       probs = dy.softmax(logits)
       loss = -dy.log(dy.pick(probs, gold_action_type.value))
       losses.append(loss)
       predicted_actions.append(probs.npvalue().argmax())
+      #TODO: Arc history is not needed at this point
+      apply_action(gold_action_type, stack, buffer, arc_history)
     loss = dy.esum(losses)
     loss_value = loss.value()
     no_actions = len(action_types)
