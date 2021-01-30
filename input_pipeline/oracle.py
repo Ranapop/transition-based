@@ -91,6 +91,16 @@ def apply_action(action_type: int,
     del buffer[0]
     stack.append(shifted_token)
 
+def get_valid_actions_mask(stack: List[int], buffer: List[int]):
+  """Creates a mask for the valid actions."""
+  mask = [0, 0, 0]
+  if len(stack)>=2:
+    mask[ArcStandardAction.LEFT_ARC.value] = 1
+    mask[ArcStandardAction.RIGHT_ARC.value] = 1
+  if len(buffer)>=1:
+    mask[ArcStandardAction.SHIFT.value] = 1
+  return mask
+
 def get_labelled_edges(heads: List[int],
                            labels: List[int]) -> Dict[Tuple[int,int], int]:
   """

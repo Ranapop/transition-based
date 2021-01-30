@@ -1,7 +1,9 @@
 from typing import List
 import dynet as dy
+import numpy as np
 from input_pipeline.data_extraction import load_from_file, DataSet
-from input_pipeline.oracle import generate_sequence_of_actions, apply_action
+from input_pipeline.oracle import generate_sequence_of_actions, apply_action,\
+  ArcStandardAction, get_valid_actions_mask
 
 NO_EPOCHS = 20
 EMBEDDINGS_SIZE = 50
@@ -41,14 +43,20 @@ class ArcStandardModel():
       probs = dy.softmax(logits)
       loss = -dy.log(dy.pick(probs, gold_action_type.value))
       losses.append(loss)
-      predicted_action = probs.npvalue().argmax()
+      if train:
+        probabilities = probs.npvalue()
+      else:
+        actions_mask = get_valid_actions_mask(stack, buffer)
+        probabilities = probs.npvalue() * np.array(actions_mask)
+      predicted_action = probabilities.argmax()
       predicted_actions.append(predicted_action)
       #TODO: Arc history is not needed at this point
       if train:
         apply_action(gold_action_type, stack, buffer, arc_history)
       else:
         # TODO: count incomplete parses / do head accuracy.
-        apply_action(predicted_action, stack, buffer, arc_history)
+        predicted_action_type = ArcStandardAction(predicted_action)
+        apply_action(predicted_action_type, stack, buffer, arc_history)
     loss = dy.esum(losses)
     loss_value = loss.value()
     gold_actions = [action_type.value for action_type in action_types]
