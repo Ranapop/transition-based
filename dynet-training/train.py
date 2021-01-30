@@ -13,6 +13,9 @@ NO_BUFFER_FEATURES = 1
 # The number of actions (left-arc, right-arc, shift).
 NO_OUTPUT_CLASSES = 3
 
+UD_ENGLISH_PATH = 'data/ud-treebanks-v2.7/UD_English-'
+ENGLISH_PARTUT = 'ParTUT/en_partut-ud-{0}.conllu'
+
 class ArcStandardModel():
 
   def __init__(self, vocab_size):
@@ -24,7 +27,7 @@ class ArcStandardModel():
   def create_cg(self, sentence: List[int], action_types: List[int], train: bool):
     # Build new computational graph.
     dy.renew_cg()
-    bilstm_repr = arc_standard_model.sentence_encoder.add_to_cg(sentence)
+    bilstm_repr = self.sentence_encoder.add_to_cg(sentence)
     n = len(sentence)
     stack = []
     buffer = list(range(n))
@@ -36,7 +39,7 @@ class ArcStandardModel():
       #TODO: Arc history is not needed at this point
       apply_action(gold_action_type, stack, buffer, arc_history)
       features = extract_features(stack, buffer, bilstm_repr)
-      logits = arc_standard_model.action_classifier.add_to_cg(features)
+      logits = self.action_classifier.add_to_cg(features)
       probs = dy.softmax(logits)
       loss = -dy.log(dy.pick(probs, gold_action_type.value))
       losses.append(loss)
@@ -141,11 +144,37 @@ def train_one_epoch(arc_standard_model: ArcStandardModel, dataset: DataSet):
   avg_accuracy = sum_accuracy/valid_entries
   return avg_loss, avg_accuracy
 
-if __name__ == '__main__':
-  file_path = "/home/paul/PycharmProjects/transition-based/mock_data/ro_rrt-ud-train.conllu"
-  dataset = load_from_file(file_path)
-  vocab_size = len(dataset.tokens_vocab.keys())
+def train_model(train_data: DataSet):
+  vocab_size = len(train_data.tokens_vocab.keys())
   arc_standard_model = ArcStandardModel(vocab_size)
   for epoch in range(NO_EPOCHS):
-    avg_loss, avg_accuracy = train_one_epoch(arc_standard_model, dataset)
+    avg_loss, avg_accuracy = train_one_epoch(arc_standard_model, train_data)
     print('Epoch {0} Loss {1} Accuracy {2}'.format(epoch, avg_loss, avg_accuracy))
+  return arc_standard_model
+
+def evaluate_model(eval_data: DataSet, trained_model: ArcStandardModel):
+  sum_loss = 0
+  sum_accuracy = 0
+  valid_entries = 0
+  for data_entry in dataset.dataset_entries:
+    act_seq = generate_sequence_of_actions(data_entry.tokens,
+                                           data_entry.heads,
+                                           data_entry.labels)
+    # Should we only test on valid entries??
+    if act_seq:
+      act_types = act_seq[0]
+      predicted, loss_value, accuracy = arc_standard_model.create_cg(data_entry.tokens,
+                                                       act_types,
+                                                       train=False)
+      sum_loss += loss_value
+      sum_accuracy += accuracy
+      valid_entries += 1
+  avg_loss = sum_loss / valid_entries
+  avg_accuracy = sum_accuracy/valid_entries
+  return avg_loss, avg_accuracy
+
+
+if __name__ == '__main__':
+  train_path = UD_ENGLISH_PATH + ENGLISH_PARTUT.format('train')
+  train_data = load_from_file(train_path)
+  arc_standard_model = train_model(train_data)
