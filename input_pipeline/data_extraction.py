@@ -8,11 +8,15 @@ HEAD = 6
 RELATION = 7
 NO_FIELDS = 10
 
+PAD = '<PAD>'
+PAD_ID = 0
+ROOT = '<ROOT>'
+ROOT_ID = 1
 class DataSet(object):
 
   def __init__(self, lines: List[str]):
     self.dataset_entries: List[DataSetEntry] = []
-    self.tokens_vocab: Dict[str, int] = {}
+    self.tokens_vocab: Dict[str, int] = {PAD: PAD_ID, ROOT: ROOT_ID}
     self.relations_vocab: Dict[str, int] = {}
 
     entry_lines = []
@@ -32,7 +36,7 @@ class DataSet(object):
 class DataSetEntry(object):
 
   def __init__(self, lines: List[str], dataset: DataSet):
-    self.tokens: List[int] = [-1]
+    self.tokens: List[int] = [ROOT_ID]
     self.heads: List[int] = [-1]
     self.labels: List[int] = [None]
 

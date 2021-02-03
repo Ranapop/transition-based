@@ -1,1 +1,3 @@
-/mock_data/
+data
+*__pycache__*
+*.cached
