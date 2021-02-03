@@ -1,6 +1,9 @@
-from typing import List
+from typing import List, Dict
+import os
+import shutil
 import dynet as dy
 import numpy as np
+import tensorflow as tf
 from input_pipeline.data_extraction import load_from_file, DataSet
 from input_pipeline.oracle import generate_sequence_of_actions, apply_action,\
   ArcStandardAction, get_valid_actions_mask
@@ -187,7 +190,19 @@ def evaluate_model(trained_model: ArcStandardModel, eval_data: DataSet):
   avg_accuracy = sum_accuracy/valid_entries
   return avg_loss, avg_accuracy
 
-def train_model(train_data: DataSet, dev_data: DataSet):
+def save_dict_to_tensorboard(event_writer: tf.summary.SummaryWriter,
+                             dict: Dict, step: int):
+  for key, val in dict.items():
+    with event_writer.as_default():
+      tf.summary.scalar(name=key, data=val, step=step)
+  event_writer.flush()
+
+def train_model(train_data: DataSet, dev_data: DataSet, logdir: str):
+  if os.path.isdir(logdir):
+    # reset logs.
+    shutil.rmtree(logdir)
+  train_event_writer = tf.summary.create_file_writer(os.path.join(logdir,'train'))
+  dev_event_writer = tf.summary.create_file_writer(os.path.join(logdir,'dev'))
   vocab_size = len(train_data.tokens_vocab.keys())
   arc_standard_model = ArcStandardModel(vocab_size)
   for epoch in range(NO_EPOCHS):
@@ -195,6 +210,10 @@ def train_model(train_data: DataSet, dev_data: DataSet):
     dev_loss, dev_acc = evaluate_model(arc_standard_model, dev_data)
     print('Epoch {0} Train loss {1}, acc {2}; Dev loss {3}, acc {4}'.format(
       epoch, train_loss, train_acc, dev_loss, dev_acc))
+    train_metrics = {'loss': train_loss, 'acc': train_acc}
+    dev_metrics = {'loss': dev_loss, 'acc': dev_acc}
+    save_dict_to_tensorboard(train_event_writer, train_metrics, epoch)
+    save_dict_to_tensorboard(dev_event_writer, dev_metrics, epoch)
   return arc_standard_model
 
 def get_data_paths(dataset_id: str):
@@ -208,7 +227,8 @@ def get_data_paths(dataset_id: str):
     
 
 if __name__ == '__main__':
+  logdir = 'temp'
   train_path, dev_path = get_data_paths('EWT')
   train_data = load_from_file(train_path)
   dev_data = load_from_file(dev_path)
-  arc_standard_model = train_model(train_data, dev_data)
+  arc_standard_model = train_model(train_data, dev_data, logdir)
