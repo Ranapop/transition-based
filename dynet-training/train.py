@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import os
 import shutil
 import dynet as dy
@@ -53,7 +53,6 @@ class ArcStandardModel():
         probabilities = probs.npvalue() * np.array(actions_mask)
       predicted_action = probabilities.argmax()
       predicted_actions.append(predicted_action)
-      #TODO: Arc history is not needed at this point
       if train:
         apply_action(gold_action_type, stack, buffer, arc_history)
       else:
@@ -62,13 +61,11 @@ class ArcStandardModel():
         apply_action(predicted_action_type, stack, buffer, arc_history)
     loss = dy.esum(losses)
     loss_value = loss.value()
-    gold_actions = [action_type.value for action_type in action_types]
-    accuracy = ArcStandardModel.compute_accuracy(gold_actions,
-                                                 predicted_actions)
+
     if train:
       loss.backward()
       self.trainer.update()
-    return predicted_actions, loss_value, accuracy
+    return predicted_actions, arc_history, loss_value
 
   @staticmethod
   def compute_accuracy(gold_actions: List[int], predicted_actions: List[int]):
@@ -79,6 +76,22 @@ class ArcStandardModel():
         correct_predictions += 1
     accuracy = correct_predictions/no_actions
     return accuracy
+
+  @staticmethod
+  def compute_head_metrics(heads: List[int], arc_history: List[Tuple[int, int]]):
+    no_heads = len(heads)
+    correct_heads = 0
+    for token1, token2 in arc_history:
+      if heads[token2] == token1:
+        correct_heads += 1
+    precision = correct_heads / (len(arc_history))
+    recall = correct_heads/no_heads
+    if precision > 0 and recall > 0:
+      f_score = 2*precision*recall/(precision+recall)
+    else:
+      f_score = 0
+    return precision, recall, f_score
+
 class SentenceEncoder():
   
   def __init__(self, model: dy.Model, vocab_size: int):
@@ -158,9 +171,12 @@ def train_one_epoch(arc_standard_model: ArcStandardModel, dataset: DataSet):
     # Make sure the action sequence can be generated.
     if act_seq:
       act_types = act_seq[0]
-      predicted, loss_value, accuracy = arc_standard_model.create_cg(data_entry.tokens,
+      predicted_actions, arc_history, loss_value = arc_standard_model.create_cg(data_entry.tokens,
                                                        act_types,
                                                        train=True)
+      gold_actions = [action_type.value for action_type in act_types]
+      accuracy = ArcStandardModel.compute_accuracy(gold_actions,
+                                                   predicted_actions)
       sum_loss += loss_value
       sum_accuracy += accuracy
       valid_entries += 1
@@ -171,6 +187,9 @@ def train_one_epoch(arc_standard_model: ArcStandardModel, dataset: DataSet):
 def evaluate_model(trained_model: ArcStandardModel, eval_data: DataSet):
   sum_loss = 0
   sum_accuracy = 0
+  sum_precision = 0
+  sum_recall = 0
+  sum_f_score = 0
   valid_entries = 0
   for data_entry in eval_data.dataset_entries:
     act_seq = generate_sequence_of_actions(data_entry.tokens,
@@ -179,16 +198,27 @@ def evaluate_model(trained_model: ArcStandardModel, eval_data: DataSet):
     # Should we only test on valid entries??
     if act_seq:
       act_types = act_seq[0]
-      predicted, loss_value, accuracy = trained_model.create_cg(
+      predicted_actions, arc_history, loss_value = trained_model.create_cg(
         data_entry.tokens,
         act_types,
         train=False)
+      gold_actions = [action_type.value for action_type in act_types]
+      accuracy = ArcStandardModel.compute_accuracy(gold_actions,
+                                                   predicted_actions)
+      precision, recall, f_score = ArcStandardModel.compute_head_metrics(data_entry.heads, arc_history)
       sum_loss += loss_value
       sum_accuracy += accuracy
+      sum_precision += precision
+      sum_recall += recall
+      sum_f_score += f_score
       valid_entries += 1
   avg_loss = sum_loss / valid_entries
   avg_accuracy = sum_accuracy/valid_entries
-  return avg_loss, avg_accuracy
+  avg_precision = sum_precision / valid_entries
+  avg_recall = sum_recall / valid_entries
+  avg_f_score = sum_f_score / valid_entries
+  percent_valid_entries = valid_entries/len(eval_data.dataset_entries)
+  return avg_loss, avg_accuracy, avg_precision, avg_recall, avg_f_score, percent_valid_entries
 
 def save_dict_to_tensorboard(event_writer: tf.summary.SummaryWriter,
                              dict: Dict, step: int):
@@ -207,11 +237,13 @@ def train_model(train_data: DataSet, dev_data: DataSet, logdir: str):
   arc_standard_model = ArcStandardModel(vocab_size)
   for epoch in range(NO_EPOCHS):
     train_loss, train_acc = train_one_epoch(arc_standard_model, train_data)
-    dev_loss, dev_acc = evaluate_model(arc_standard_model, dev_data)
-    print('Epoch {0} Train loss {1}, acc {2}; Dev loss {3}, acc {4}'.format(
-      epoch, train_loss, train_acc, dev_loss, dev_acc))
+    dev_loss, dev_acc, dev_p, dev_r, dev_f, valid = evaluate_model(arc_standard_model, dev_data)
+    print('Epoch {0} - Valid entries: {1}'.format(epoch, valid))
+    print('Train loss {0}, acc {1}; Dev loss {2}, acc {3}, precision {4}, recall {5}, UAL {6}'.format(
+      train_loss, train_acc, dev_loss, dev_acc, dev_p, dev_r, dev_f))
     train_metrics = {'loss': train_loss, 'acc': train_acc}
-    dev_metrics = {'loss': dev_loss, 'acc': dev_acc}
+    dev_metrics = {'loss': dev_loss, 'acc': dev_acc, 'head_precision': dev_p,
+                   'head_recall': dev_r, 'UAL': dev_f}
     save_dict_to_tensorboard(train_event_writer, train_metrics, epoch)
     save_dict_to_tensorboard(dev_event_writer, dev_metrics, epoch)
   return arc_standard_model
