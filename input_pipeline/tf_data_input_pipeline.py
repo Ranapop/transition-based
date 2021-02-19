@@ -33,6 +33,7 @@ class TfDataSet():
       'action_types': tf.ragged.constant(all_action_types)
     }
     tf_dataset = tf.data.Dataset.from_tensor_slices(data)
+    tf_dataset = tf_dataset.map(lambda x: x) # convert ragged -> uniform
     return tf_dataset
   
   def get_batches(self, batch_size: int, drop_remainder: bool = True):
@@ -40,8 +41,8 @@ class TfDataSet():
       'tokens': [None],
       'action_types': [None]
     }
-    return self.tf_data.padded_batch(
-      batch_size, padded_shapes, drop_remainder)
+    return tf_data.padded_batch(
+      batch_size, padded_shapes=padded_shapes, drop_remainder=drop_remainder)
 
 
 if __name__=="__main__":
@@ -59,3 +60,6 @@ if __name__=="__main__":
     print(entry)
     print()
   batches = tf_dataset.get_batches(batch_size=5)
+  first_batch = next(batches.as_numpy_iterator())
+  print('First batch')
+  print(first_batch)
