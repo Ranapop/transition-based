@@ -137,8 +137,8 @@ def get_dependents(heads: List[int]) -> List[List[int]]:
     
 def generate_sequence_of_actions(sentence: List[int],
                                  heads: List[int],
-                                 labels: List[int]
-                                 ) -> Tuple[List[int], List[int]]:
+                                 labels: List[int],
+                                 partial_result: bool = False):
   """
   Generate a sequence of actions. Use the static shortest-stack oracle for the
   arc standard transition-system.
@@ -154,6 +154,8 @@ def generate_sequence_of_actions(sentence: List[int],
     A sequence of actions. Each action has an action type and action label (arc
     label or shifted token). The sequence of actions is represented through two
     arrays: action_types and action_labels, a tuple of which is returned.
+    If the sequence of actions cannot be fully generated, it can return None or
+    the partial sequence of actions, depending on the 'partial_result' flag.
   """
   n = len(sentence)
   stack = []
@@ -171,7 +173,10 @@ def generate_sequence_of_actions(sentence: List[int],
                                    gold_labelled_edges, gold_dependents,
                                    sentence)
     if action is None:
-      return None
+      if partial_result:
+        return (action_types, action_labels)
+      else:
+        return None
     # Apply action.
     apply_action( action[0], stack, buffer, arc_history)
     # Save action.
@@ -180,6 +185,9 @@ def generate_sequence_of_actions(sentence: List[int],
   
   # Check that the stack contains the root.
   if stack[0]!=0:
-    return None
+    if partial_result:
+      return (action_types, action_labels)
+    else:
+      return None
   # Return the sequence of actions.
   return (action_types, action_labels)
